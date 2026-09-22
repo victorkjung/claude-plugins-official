@@ -957,6 +957,20 @@
       "homepage": "https://github.com/huggingface/skills.git"
     },
     {
+      "name": "i-have-adhd",
+      "description": "Shape Claude Code output for an ADHD reader: lead with the next action, number the steps, suppress tangents, restate current state, and make progress visible. Ships a skill plus an opt-in SessionStart hook that keeps the ruleset always on.",
+      "author": {
+        "name": "Ayoub G."
+      },
+      "category": "productivity",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/ayghri/i-have-adhd.git",
+        "sha": "839872f9d1cd634fed642b4589ce7226199cc15f"
+      },
+      "homepage": "https://github.com/ayghri/i-have-adhd"
+    },
+    {
       "name": "imessage",
       "description": "iMessage messaging bridge with built-in access control. Reads chat.db directly, sends via AppleScript. Manage pairing, allowlists, and policy via /imessage:access.",
       "category": "productivity",
