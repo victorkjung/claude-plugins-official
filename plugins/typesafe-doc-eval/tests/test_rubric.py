@@ -152,6 +152,28 @@ def test_choice_label_parsed_as_boolean_explains_how_to_fix():
         ),
         ("\npolicy: {pass_at: 40, fail_below: 60}\n", "fail_below must not exceed pass_at"),
         ("\nunexpected: true\n", "Extra inputs are not permitted"),
+        (
+            """
+  nested:
+    label: Nested
+    type: score
+    instructions: {task: Rate `document.text`., scale: {0: unclear, 1: clear}}
+    criteria: [a, b]
+""",
+            "not a valid TypeSafe question",
+        ),
+        (
+            """
+  dated:
+    label: Dated
+    type: score
+    instructions: {task: Rate `document.text`., as_of: 2026-01-01}
+    criteria: [a, b]
+""",
+            "not a valid TypeSafe question",
+        ),
+        ('\n  "clarity\\n": {label: C, type: score, instructions: x, criteria: [a, b]}\n', "must match"),
+        ("\n  clarity: {label: Dup, type: score, instructions: x, criteria: [a, b]}\n", "duplicate key 'clarity'"),
     ],
 )
 def test_invalid_rubrics_are_rejected_with_a_located_message(extra, message):
@@ -203,3 +225,12 @@ def test_example_rubrics_are_valid(path: Path):
 
     rubric = load_rubric_file(path)
     assert rubric.verdict_id and {dim.type for dim in rubric.dimensions.values()} == {"score", "noul", "choice"}
+
+
+def test_non_utf8_rubric_file_is_a_rubric_error(tmp_path: Path):
+    from typesafe_doc_eval.rubric import load_rubric_file
+
+    path = tmp_path / "latin1.yaml"
+    path.write_bytes(MINIMAL.replace("Testers.", "Caf\xe9 owners.").encode("latin-1"))
+    with pytest.raises(RubricError, match="not UTF-8"):
+        load_rubric_file(path)

@@ -55,6 +55,7 @@ class ScriptedAPI:
         self.answer: Answerer = strong_document
         self.status = 200
         self.raise_error: Exception | None = None
+        self.error_detail = "scripted failure"
 
     def transport(self) -> httpx2.MockTransport:
         return httpx2.MockTransport(self._handle)
@@ -65,7 +66,7 @@ class ScriptedAPI:
         if self.raise_error is not None:
             raise self.raise_error
         if self.status != 200:
-            return httpx2.Response(self.status, json={"detail": "scripted failure"})
+            return httpx2.Response(self.status, json={"detail": self.error_detail})
         answers = {name: self.answer(name, question, body) for name, question in body["questions"].items()}
         usage = {"input_tokens": 100, "output_tokens": len(answers)}
         return httpx2.Response(200, json={"model": "jev-test", "answers": answers, "usage": usage})

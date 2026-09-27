@@ -72,7 +72,7 @@ def _respond(request: httpx2.Request) -> httpx2.Response:
         elif name == ROUTE_ID:
             pick = _route(labels, state.lower())
         else:
-            pick = rng.choices(labels, weights=[4, 3, 1.5, 1, 0.5, 0.5, 0.5, 0.5][: len(labels)])[0]
+            pick = rng.choices(labels, weights=[max(4 - rank, 0.5) for rank in range(len(labels))])[0]
         confidence = round(rng.uniform(0.55, 0.95), 3)
         rest = (1 - confidence) / (len(labels) - 1)
         answers[name] = {

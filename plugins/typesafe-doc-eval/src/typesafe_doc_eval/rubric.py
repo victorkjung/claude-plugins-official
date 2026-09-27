@@ -8,7 +8,7 @@ not the model, combines the answers into a composite score and a status.
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
+from collections.abc import Hashable, Mapping
 from importlib import resources
 from pathlib import Path
 from typing import Annotated, Any, Literal
@@ -25,7 +25,7 @@ KIND_CHECK_ID = "_kind_check"
 ROUTE_ID = "_route"
 NO_MATCH = "none"
 
-_ID_PATTERN = r"^[a-z][a-z0-9_]*$"
+_ID_PATTERN = r"[a-z][a-z0-9_]*"
 _NAME_PATTERN = r"^[a-z][a-z0-9-]*$"
 
 
@@ -170,9 +170,14 @@ class Rubric(BaseModel):
         if self.name == NO_MATCH:
             raise ValueError(f"rubric name {NO_MATCH!r} is reserved")
         for dim_id, dim in self.dimensions.items():
-            if not re.match(_ID_PATTERN, dim_id):
+            if not re.fullmatch(_ID_PATTERN, dim_id):
                 raise ValueError(f"dimension id {dim_id!r} must match {_ID_PATTERN} (lowercase, digits, underscores)")
             _check_flag(dim_id, dim)
+            try:  # the SDK's own question types are the contract; reject what the API would reject
+                dim.question()
+            except ValueError as error:
+                detail = error.errors()[0]["msg"] if isinstance(error, ValidationError) else str(error)
+                raise ValueError(f"{dim_id}: not a valid TypeSafe question ({detail})") from None
         verdicts = {
             dim_id: dim for dim_id, dim in self.dimensions.items() if isinstance(dim, ChoiceDimension) and dim.role
         }
@@ -277,14 +282,29 @@ def load_rubric_file(path: Path) -> Rubric:
         text = path.read_text(encoding="utf-8")
     except OSError as error:
         raise RubricError(f"cannot read rubric {path}: {error.strerror or error}") from error
+    except UnicodeDecodeError as error:
+        raise RubricError(f"cannot read rubric {path}: not UTF-8 ({error.reason} at byte {error.start})") from error
     rubric = parse_rubric(text, origin=str(path))
     rubric._source = path
     return rubric
 
 
+class _UniqueKeyLoader(yaml.SafeLoader):
+    """SafeLoader that rejects duplicate keys, which YAML would otherwise resolve silently (last one wins)."""
+
+    def construct_mapping(self, node: yaml.MappingNode, deep: bool = False) -> dict[Hashable, object]:
+        seen: set[object] = set()
+        for key_node, _ in node.value:
+            key = self.construct_object(key_node, deep=deep)
+            if isinstance(key, Hashable) and key in seen:
+                raise yaml.constructor.ConstructorError(None, None, f"duplicate key {key!r}", key_node.start_mark)
+            seen.add(key)
+        return super().construct_mapping(node, deep=deep)
+
+
 def parse_rubric(text: str, *, origin: str) -> Rubric:
     try:
-        data = yaml.safe_load(text)
+        data = yaml.load(text, Loader=_UniqueKeyLoader)
     except yaml.YAMLError as error:
         raise RubricError(f"{origin}: invalid YAML: {error}") from error
     if not isinstance(data, dict):

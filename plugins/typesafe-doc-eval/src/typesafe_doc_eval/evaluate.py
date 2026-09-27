@@ -9,6 +9,7 @@ picks the rubric first, because its answer decides which questions to ask next.
 from __future__ import annotations
 
 import asyncio
+import os
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -27,6 +28,7 @@ from typesafe_sdk import (
     TypeSafePermissionDeniedError,
     TypeSafeRateLimitError,
 )
+from typesafe_sdk.constants import BASE_URL_ENV, DEFAULT_BASE_URL
 
 from typesafe_doc_eval.extract import PreparedDocument
 from typesafe_doc_eval.policy import Decision, EvaluationError, decide, unrouted
@@ -198,7 +200,8 @@ def describe_error(error: TypeSafeError) -> str:
     if isinstance(error, TypeSafeAPITimeoutError):
         return f"request timed out; raise --timeout for long documents ({error})"
     if isinstance(error, TypeSafeAPIConnectionError):
-        return f"cannot reach the TypeSafe API; check network access to api.typesafe.ai ({error})"
+        host = os.environ.get(BASE_URL_ENV, "").strip() or DEFAULT_BASE_URL
+        return f"cannot reach the TypeSafe API; check network access to {host} ({error})"
     if isinstance(error, TypeSafeRateLimitError):
         return f"rate limited after retries; lower --concurrency ({error})"
     return str(error)

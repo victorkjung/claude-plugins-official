@@ -5,14 +5,16 @@ block, so changing them re-scores nothing: the same answers produce a new status
 
     pass    verdict approve (if the rubric has one) and composite >= pass_at
     revise  fixable: verdict revise, or composite between fail_below and pass_at
-    review  a person should decide: low-confidence or conflicting signals, a flagged answer,
-            a truncated document, or a document that may not fit the rubric
+    review  a person should decide: conflicting signals, a low-confidence verdict (unless the
+            composite fails on its own), a flagged answer, a truncated document, or a document
+            that may not fit the rubric
     fail    verdict reject, or composite < fail_below
 """
 
 from __future__ import annotations
 
 import json
+import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal
@@ -37,6 +39,11 @@ WEAK_BELOW = 0.75
 
 class EvaluationError(Exception):
     """The API answered, but not with what the rubric asked for."""
+
+
+def points(composite: float) -> int:
+    """Composite for display, floored so it never reads as meeting a bar it missed (74.6 shows as 74)."""
+    return math.floor(composite)
 
 
 @dataclass(frozen=True)
@@ -153,43 +160,48 @@ def _base_status(
     if verdict is None:
         assert composite is not None  # rubric validation guarantees a verdict or a weighted dimension
         if composite >= pass_at:
-            reasons.append(f"Composite {composite:.0f} ≥ pass bar {pass_at:g}")
+            reasons.append(f"Composite {points(composite)} >= pass bar {pass_at:g}")
             return "pass"
         if composite < fail_below:
-            reasons.append(f"Composite {composite:.0f} < fail bar {fail_below:g}")
+            reasons.append(f"Composite {points(composite)} < fail bar {fail_below:g}")
             return "fail"
-        reasons.append(f"Composite {composite:.0f} is between the fail bar {fail_below:g} and pass bar {pass_at:g}")
+        reasons.append(f"Composite {points(composite)} is between the fail bar {fail_below:g} and pass bar {pass_at:g}")
         return "revise"
 
     label, confidence = str(verdict.value), verdict.confidence or 0.0
     said = f"Verdict {label} ({confidence:.2f})"
+    shown = "" if composite is None else str(points(composite))
+    if composite is not None and (
+        (label == "approve" and composite < fail_below) or (label == "reject" and composite >= pass_at)
+    ):
+        # Two independent signals disagree: escalate instead of picking one.
+        reasons.append(f"{said} conflicts with composite {shown}")
+        return "review"
+    if composite is not None and composite < fail_below:
+        # The composite fails on its own, whatever the verdict or its confidence.
+        reasons.append(f"Composite {shown} < fail bar {fail_below:g}; {said.lower()}")
+        return "fail"
+    if confidence < policy.min_confidence:
+        # The verdict decides the status from here, so an uncertain verdict goes to a person.
+        reasons.append(f"Low-confidence verdict: {label} ({confidence:.2f} < {policy.min_confidence:g})")
+        return "review"
+
     status: Status
     if composite is None:
         status = VERDICT_STATUS[label]
         reasons.append(said)
-    elif (label == "approve" and composite < fail_below) or (label == "reject" and composite >= pass_at):
-        # Two independent signals disagree: escalate instead of picking one.
-        reasons.append(f"{said} conflicts with composite {composite:.0f}")
-        return "review"
     elif label == "reject":
         status = "fail"
-        reasons.append(said)
-    elif composite < fail_below:
-        status = "fail"
-        reasons.append(f"Composite {composite:.0f} < fail bar {fail_below:g}; {said.lower()}")
+        reasons.append(f"{said}; composite {shown}")
     elif label == "approve" and composite >= pass_at:
         status = "pass"
-        reasons.append(f"{said}; composite {composite:.0f} ≥ pass bar {pass_at:g}")
+        reasons.append(f"{said}; composite {shown} >= pass bar {pass_at:g}")
     elif label == "approve":
         status = "revise"
-        reasons.append(f"{said}, but composite {composite:.0f} < pass bar {pass_at:g}")
+        reasons.append(f"{said}, but composite {shown} < pass bar {pass_at:g}")
     else:
         status = "revise"
-        reasons.append(f"{said}; composite {composite:.0f}")
-
-    if confidence < policy.min_confidence:
-        status = _escalate(status, "review")
-        reasons.append(f"Low-confidence verdict ({confidence:.2f} < {policy.min_confidence:g})")
+        reasons.append(f"{said}; composite {shown}")
     return status
 
 
@@ -202,7 +214,8 @@ def _composite(outcomes: list[DimensionOutcome]) -> float | None:
     total = sum(weight for weight, _ in weighted)
     if total == 0:
         return None
-    return 100 * sum(weight * normalized for weight, normalized in weighted) / total
+    # Rounded so float noise cannot drop an exact 75.0 to 74.99999999999999 below a bar.
+    return round(100 * sum(weight * normalized for weight, normalized in weighted) / total, 6)
 
 
 def _outcome(dim_id: str, dim: ScoreDimension | ChoiceDimension | NoulDimension, answer: Answer) -> DimensionOutcome:

@@ -48,15 +48,16 @@ evaluated.
 |---|---|
 | pass | Verdict approve and composite at or above the pass bar (75 by default) |
 | revise | Fixable: verdict revise, or composite between the fail and pass bars |
-| review | A person should decide: conflicting or low-confidence signals, a flagged answer, a truncated document, or one that may not fit the rubric |
+| review | A person should decide: conflicting signals, a low-confidence verdict (unless the composite fails on its own), a flagged answer, a truncated document, or one that may not fit the rubric |
 | fail | Verdict reject, or composite below the fail bar (50 by default) |
-| error | Not evaluated (unreadable file, missing key, API error) |
+| error | Not evaluated (unreadable file or API error); the rest of the batch still runs |
 
 When you report back, lead with the status counts. Then, for each document that did not pass, give
 the reasons and the weakest dimensions with their `level` text, and propose specific edits drawn
 from the document itself. These are calibrated model judgments, not ground truth: point out low
 confidence, and recommend a human look at `review` documents. Exit codes: 0 ok, 1 `--fail-on`
-tripped, 2 usage or rubric error, 3 a document could not be evaluated.
+tripped, 2 usage or rubric error (including a missing API key; no report is produced), 3 a document
+could not be evaluated, 4 internal error.
 
 ## Custom rubrics
 
@@ -84,6 +85,7 @@ https://github.com/typesafe-ai/skills and the docs at https://docs.typesafe.ai.
 ## Data handling
 
 Document text is sent to api.typesafe.ai. By default, emails, phone numbers, SSNs, card numbers,
-and API secrets are replaced with placeholders such as `[EMAIL]` before sending (`--no-redact`
-turns this off). Documents longer than `--max-chars` (default 120,000) keep their head and tail,
+and credentials are replaced with placeholders such as `[EMAIL]` before sending (`--no-redact`
+turns this off). Redaction is pattern-based and does not mask names, addresses, or unlabeled ID
+numbers, so warn the user before evaluating documents with sensitive personal data. Documents longer than `--max-chars` (default 120,000) keep their head and tail,
 and the truncated document is sent to review.

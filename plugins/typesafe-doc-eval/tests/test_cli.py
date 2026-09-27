@@ -1,4 +1,7 @@
 import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 import httpx2
@@ -213,3 +216,91 @@ def test_unwritable_output_fails_before_calling_the_api(api: ScriptedAPI, lease,
     assert cli.main([str(lease), "-p", "property", "-o", str(tmp_path / "missing" / "report.md")]) == 2
     assert "does not exist" in capsys.readouterr().err
     assert api.requests == []
+
+
+def test_markup_like_names_and_errors_render_literally(api: ScriptedAPI, tmp_path, capsys):
+    path = tmp_path / "lease [signed].md"
+    path.write_text("Tenant pays $2,850 per month.", encoding="utf-8")
+    assert cli.main([str(path), "-p", "property"]) == 0
+    assert "lease [signed].md" in capsys.readouterr().out
+    api.status, api.error_detail = 422, "bad [/Top] value"  # rich markup would raise MarkupError on this
+    assert cli.main([str(path), "-p", "property"]) == 3
+    assert "bad [/Top] value" in capsys.readouterr().out
+
+
+def test_output_directory_is_rejected_before_calling_the_api(api: ScriptedAPI, lease, tmp_path, capsys):
+    assert cli.main([str(lease), "-p", "property", "-o", str(tmp_path)]) == 2
+    assert "is a directory" in capsys.readouterr().err and api.requests == []
+
+
+def test_non_finite_timeout_is_a_usage_error(lease, capsys):
+    assert cli.main([str(lease), "--timeout", "nan"]) == 2
+    err = capsys.readouterr().err
+    assert "--timeout" in err and "Get a key" not in err
+
+
+def test_internal_errors_exit_4_not_the_gate_code(api: ScriptedAPI, lease, capsys, monkeypatch):
+    def broken(*args, **kwargs):
+        raise RuntimeError("renderer bug")
+
+    monkeypatch.setattr(cli, "render_table", broken)
+    assert cli.main([str(lease), "-p", "property"]) == 4
+    err = capsys.readouterr().err
+    assert "RuntimeError: renderer bug" in err and "internal error" in err
+
+
+def test_mock_handles_choices_with_many_labels(tmp_path, lease, capsys):
+    labels = "\n".join(f"      l{i}: Label {i}." for i in range(12))
+    rubric = tmp_path / "many.yaml"
+    rubric.write_text(
+        "name: many\ntitle: Many\ndescription: d\ndocument_kind: k\naudience: a\ndimensions:\n"
+        "  clarity: {label: Clarity, type: score, instructions: Rate `document.text`., criteria: [a, b, c]}\n"
+        "  kind:\n    label: Kind\n    type: choice\n    instructions: Kind of `document.text`?\n"
+        f"    criteria:\n{labels}\n",
+        encoding="utf-8",
+    )
+    code, report = run_json(capsys, str(lease), "-r", str(rubric), "--mock")
+    assert code in (0, 1) and report["documents"][0]["error"] is None
+
+
+def run_module(*args: str, env: dict[str, str]) -> subprocess.CompletedProcess[bytes]:
+    return subprocess.run(
+        [sys.executable, "-m", "typesafe_doc_eval", *args],
+        capture_output=True,
+        env={**os.environ, **env},
+        timeout=120,
+        check=False,
+    )
+
+
+@pytest.mark.parametrize("fmt", ["table", "json", "markdown"])
+def test_non_utf8_consoles_do_not_crash(lease, fmt):
+    result = run_module(
+        str(lease), "-p", "property", "--mock", "-f", fmt, "--fail-on", "never", env={"PYTHONIOENCODING": "cp1252"}
+    )
+    assert result.returncode == 0, result.stderr.decode(errors="replace")
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="needs a filesystem that accepts non-UTF-8 names")
+def test_undecodable_file_names_do_not_crash(tmp_path):
+    folder = tmp_path / "docs"
+    folder.mkdir()
+    (folder / os.fsdecode(b"caf\xe9.md")).write_text("Tenant pays $2,850 per month.", encoding="utf-8")
+    report = tmp_path / "report.md"
+    result = run_module(
+        str(folder),
+        "-p",
+        "property",
+        "--mock",
+        "-f",
+        "json",
+        "--fail-on",
+        "never",
+        env={"PYTHONIOENCODING": "utf-8:strict"},
+    )
+    assert result.returncode == 0, result.stderr.decode(errors="replace")
+    json.loads(result.stdout)
+    result = run_module(
+        str(folder), "-p", "property", "--mock", "-f", "markdown", "-o", str(report), "--fail-on", "never", env={}
+    )
+    assert result.returncode == 0 and "caf" in report.read_text(encoding="utf-8")

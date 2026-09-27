@@ -50,6 +50,9 @@ def answers(composite: float, verdict: str = "approve", verdict_confidence: floa
         ("approve", 0.9, 30, "review"),
         ("approve", 0.4, 85, "review"),  # low-confidence verdict
         ("revise", 0.4, 45, "fail"),  # a clear fail stays a fail
+        ("reject", 0.34, 65, "review"),  # an uncertain reject is not a gate failure
+        ("reject", 0.9, 65, "fail"),
+        ("approve", 0.9, 75, "pass"),  # exactly on the bar passes despite float noise
     ],
 )
 def test_status_table(verdict, confidence, composite, status):
@@ -126,3 +129,9 @@ def test_missing_or_mistyped_answers_are_errors():
     mistyped["clarity"] = NoulAnswer(type="noul", noul=0.5)
     with pytest.raises(EvaluationError, match="expected a score answer"):
         decide(PROPERTY, mistyped)
+
+
+def test_reasons_never_round_up_to_the_bar():
+    decision = decide(PROPERTY, answers(74.6))
+    assert decision.status == "revise"
+    assert decision.reasons == ["Verdict approve (0.90), but composite 74 < pass bar 75"]

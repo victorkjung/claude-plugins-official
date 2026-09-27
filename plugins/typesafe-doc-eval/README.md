@@ -66,14 +66,15 @@ flowchart LR
   example 2.6 of 4) with a confidence; choices return a label with probabilities; nouls return
   P(yes). A document's questions all go out in one request, so they run in parallel and cannot
   influence each other.
-- **Code decides, not the model.** The composite is the weighted mean of the score dimensions,
-  scaled to 0-100. The status comes from explicit rules:
+- **Code decides, not the model.** The composite is the weighted mean of the score dimensions
+  (and of any weighted yes/no dimensions in custom rubrics), scaled to 0-100. The status comes
+  from explicit rules:
 
   | Status | Rule |
   |---|---|
   | pass | Verdict approve and composite ≥ pass bar (75) |
   | revise | Verdict revise, or composite between the fail bar (50) and the pass bar |
-  | review | Verdict and composite disagree, verdict confidence < 0.5, a flagged answer (such as a hostile tone), a truncated document, or a document that may not fit its rubric |
+  | review | Verdict and composite disagree, verdict confidence < 0.5 (unless the composite fails on its own), a flagged answer (such as a hostile tone), a truncated document, or a document that may not fit its rubric |
   | fail | Verdict reject, or composite < fail bar |
 
 - **Thresholds are policy.** Change them per run (`--pass-at`, `--fail-below`) or per rubric
@@ -89,8 +90,9 @@ flowchart LR
 - `markdown`: a shareable report for docs, PRs, or email.
 
 Exit codes are 0 for ok, 1 when a document's status is at least `--fail-on` (default `fail`;
-`revise` means "everything must pass"), 2 for a usage or rubric error, and 3 when a document could
-not be evaluated.
+`revise` means "everything must pass"), 2 for a usage or rubric error, 3 when a document could
+not be evaluated, and 4 for an internal error. For a CI gate, `--fail-on review` is the
+conservative choice: it also stops documents that need a person's judgment.
 
 ## Custom rubrics
 
@@ -103,9 +105,11 @@ question-design rules. Check a rubric with `--dry-run -f json` before spending t
 
 ## Data handling, cost, and limits
 
-- Document text is sent to `api.typesafe.ai`. Emails, phone numbers, SSNs, card numbers, and API
-  secrets are replaced with placeholders such as `[EMAIL]` before sending; `--no-redact` turns
-  this off.
+- Document text is sent to `api.typesafe.ai`. Before sending, doc-eval replaces emails, phone
+  numbers, SSNs, Luhn-valid card numbers, and credentials (API tokens, password and key fields,
+  private keys) with placeholders such as `[EMAIL]`. It is pattern-based: unlabeled 9- or 10-digit
+  numbers, names, and addresses are not masked, so treat it as a safety net and not a guarantee.
+  `--no-redact` turns it off.
 - Documents longer than `--max-chars` (default 120,000 characters) keep their head and tail and go
   to review. Scanned PDFs without a text layer need OCR first.
 - TypeSafe bills input tokens. Expect the document's length plus roughly 1,300-1,700 tokens of

@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import math
 import os
 import sys
+import traceback
 from collections.abc import Sequence
 from contextlib import nullcontext
 from pathlib import Path
@@ -30,7 +32,7 @@ from typesafe_doc_eval.report import (
 )
 from typesafe_doc_eval.rubric import RubricError, load_preset, preset_names, preset_text, resolve_rubrics
 
-EXIT_OK, EXIT_GATE, EXIT_USAGE, EXIT_ERRORS = 0, 1, 2, 3
+EXIT_OK, EXIT_GATE, EXIT_USAGE, EXIT_ERRORS, EXIT_INTERNAL = 0, 1, 2, 3, 4
 
 EPILOG = f"""\
 examples:
@@ -42,7 +44,8 @@ examples:
 
 supported files: {", ".join(sorted(SUPPORTED_SUFFIXES))}
 environment: TYPESAFE_API_KEY (required), TYPESAFE_DEFAULT_MODEL, TYPESAFE_BASE_URL
-exit codes: 0 ok · 1 a document tripped --fail-on · 2 usage or rubric error · 3 a document could not be evaluated
+exit codes: 0 ok · 1 a document tripped --fail-on · 2 usage or rubric error · 3 a document could not be evaluated ·
+            4 internal error
 """
 
 
@@ -137,6 +140,11 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    for stream in (sys.stdout, sys.stderr):
+        # Undecodable file names and consoles without UTF-8 must not crash a finished run.
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(errors="backslashreplace")
     args = build_parser().parse_args(argv)
     try:
         return run(args)
@@ -145,10 +153,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         return EXIT_USAGE
     except KeyboardInterrupt:
         return 130
+    except Exception:  # a bug, not a gate result: keep it distinguishable from exit 1 in CI
+        traceback.print_exc()
+        print("doc-eval: internal error (exit 4); please report it with the traceback above", file=sys.stderr)
+        return EXIT_INTERNAL
 
 
 def run(args: argparse.Namespace) -> int:
-    stdout = Console(highlight=False, soft_wrap=False)
+    stdout = Console(highlight=False, soft_wrap=False, markup=False, emoji=False)
     if args.list_presets:
         render_presets(stdout, [load_preset(name) for name in preset_names()])
         return EXIT_OK
@@ -158,13 +170,15 @@ def run(args: argparse.Namespace) -> int:
 
     if args.concurrency < 1:
         raise UsageError("--concurrency must be at least 1")
-    if args.timeout <= 0:
-        raise UsageError("--timeout must be positive")
+    if not math.isfinite(args.timeout) or args.timeout <= 0:
+        raise UsageError("--timeout must be a positive number of seconds")
     if args.max_chars < 0:
         raise UsageError("--max-chars must be 0 (never truncate) or more")
     if args.out is not None:
         # Fail before spending tokens, not after.
         parent = args.out.parent if str(args.out.parent) else Path(".")
+        if args.out.is_dir():
+            raise UsageError(f"cannot write {args.out}: it is a directory")
         if not parent.is_dir() or not os.access(parent, os.W_OK):
             raise UsageError(f"cannot write {args.out}: directory {parent} does not exist or is not writable")
     rubrics = resolve_rubrics(args.preset, args.rubric)
@@ -226,8 +240,9 @@ async def _evaluate(docs: list, rubrics: list, options: Options, args: argparse.
             transport=mock.transport() if args.mock else None,
         )
     except TypeSafeError as error:
-        raise UsageError(f"{error} Get a key at https://typesafe.ai, or preview output with --mock.") from error
-    stderr = Console(stderr=True)
+        hint = " Get a key at https://typesafe.ai, or preview output with --mock." if "API key" in str(error) else ""
+        raise UsageError(f"{error}{hint}") from error
+    stderr = Console(stderr=True, markup=False, emoji=False)
     progress = Progress(
         SpinnerColumn(),
         TextColumn("Evaluating"),
@@ -267,13 +282,14 @@ def _output(path: Path | None):
     if path is None:
         return nullcontext(sys.stdout)
     try:
-        return path.open("w", encoding="utf-8")
+        return path.open("w", encoding="utf-8", errors="backslashreplace")
     except OSError as error:
         raise UsageError(f"cannot write {path}: {error.strerror or error}") from error
 
 
 def _console(out: TextIO, path: Path | None) -> Console:
-    console = Console(file=out, highlight=False, no_color=path is not None)
+    # markup=False: file names, errors, and rubric text are data; "[/Top]" in a PDF error must not parse as markup.
+    console = Console(file=out, highlight=False, no_color=path is not None, markup=False, emoji=False)
     if not console.is_terminal:
         console.width = 160  # files and pipes: wide enough for the score matrix
     return console

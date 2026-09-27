@@ -20,7 +20,7 @@ from rich.text import Text
 from typesafe_doc_eval import __version__
 from typesafe_doc_eval.evaluate import DocumentResult, PlannedRequest
 from typesafe_doc_eval.extract import PreparedDocument
-from typesafe_doc_eval.policy import DimensionOutcome
+from typesafe_doc_eval.policy import DimensionOutcome, points
 from typesafe_doc_eval.rubric import Rubric, ScoreDimension
 
 STATUSES = ("pass", "revise", "review", "fail", "error")
@@ -74,10 +74,10 @@ def _summary_line(results: Sequence[DocumentResult]) -> str:
 def display_names(paths: Sequence[Path]) -> dict[Path, str]:
     """Paths relative to the inputs' common directory, so terminal tables don't repeat it on every row."""
     try:
-        base = Path(os.path.commonpath([str(path.resolve().parent) for path in paths]))
+        base = os.path.commonpath([os.path.dirname(os.path.abspath(path)) for path in paths])
     except ValueError:  # no paths, or paths on different drives
         return {path: str(path) for path in paths}
-    return {path: str(path.resolve().relative_to(base)) for path in paths}
+    return {path: os.path.relpath(os.path.abspath(path), base) for path in paths}
 
 
 # --- JSON ------------------------------------------------------------------------------------------------------------
@@ -169,7 +169,7 @@ def _verdict_text(result: DocumentResult) -> str:
 
 def _composite_text(result: DocumentResult) -> str:
     decision = result.decision
-    return f"{decision.composite:.0f}" if decision and decision.composite is not None else "—"
+    return str(points(decision.composite)) if decision and decision.composite is not None else "—"
 
 
 def to_markdown(results: Sequence[DocumentResult], info: RunInfo) -> str:
@@ -199,7 +199,7 @@ def to_markdown(results: Sequence[DocumentResult], info: RunInfo) -> str:
         if result.route and result.rubric:
             facts.append(f"routed with confidence {result.route.confidence:.2f}")
         if decision.composite is not None:
-            facts.append(f"composite **{decision.composite:.0f}**/100")
+            facts.append(f"composite **{points(decision.composite)}**/100")
         if decision.verdict:
             facts.append(f"verdict **{decision.verdict}** ({decision.verdict_confidence or 0:.2f})")
         lines += [" · ".join(facts), ""]
@@ -312,7 +312,7 @@ def _table(rubric: Rubric, note: str = "") -> Table:
     scales = sorted({dim.max_level for dim in rubric.dimensions.values() if isinstance(dim, ScoreDimension)})
     caption = (
         f"scores {'/'.join(f'0-{top}' for top in scales)} · composite 0-100: "
-        f"pass ≥ {policy.pass_at:g}, fail < {policy.fail_below:g}{note}"
+        f"pass >= {policy.pass_at:g}, fail < {policy.fail_below:g}{note}"
     )
     return Table(
         title=f"{rubric.title} · {rubric.name}",
@@ -424,7 +424,7 @@ def _details_panel(result: DocumentResult, name: str) -> Panel:
         table.add_row(outcome.label, _outcome_cell(outcome), bar, confidence, outcome.level or "")
     header = Text()
     if decision.composite is not None:
-        header.append(f"Composite {decision.composite:.0f}/100   ")
+        header.append(f"Composite {points(decision.composite)}/100   ")
     if decision.verdict:
         header.append(f"Verdict {_verdict_text(result)}", style=VERDICT_STYLE.get(decision.verdict, ""))
     parts: list[Any] = [header, table]

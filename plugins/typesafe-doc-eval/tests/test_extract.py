@@ -1,3 +1,4 @@
+import time
 from pathlib import Path
 
 import docx
@@ -136,3 +137,79 @@ def test_prepare_redacts_before_truncating(tmp_path: Path):
     assert doc.redactions == {"email": 1} and doc.truncated
     assert "[EMAIL]" in doc.text and doc.original_chars > 500
     assert "jordan@example.com" in prepare(path, max_chars=0, redact=False).text
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        # Leaks the first redactor missed.
+        ("Deposit card: 4111 1111 1111 1111 12/28", "Deposit card: [CARD] 12/28"),
+        ("Applicant SSN 123456789.", "Applicant SSN [SSN]."),
+        ("Social Security Number: 123 45 6789", "Social Security Number: [SSN]"),
+        ("Phone: 2125550100 / Cell 212 555 0100", "Phone: [PHONE] / Cell [PHONE]"),
+        (
+            "DB_PASSWORD=hunter2\nAWS_SECRET_ACCESS_KEY=abc123xyz789",
+            "DB_PASSWORD=[SECRET]\nAWS_SECRET_ACCESS_KEY=[SECRET]",
+        ),
+        ('{"api_key": "abc123xyz", "client_secret": "s3cr3t"}', '{"api_key": "[SECRET]", "client_secret": "[SECRET]"}'),
+        ("key:\n-----BEGIN RSA PRIVATE KEY-----\nMIIEow\n-----END RSA PRIVATE KEY-----\nend", "key:\n[SECRET]\nend"),
+        # Business facts the first redactor corrupted or might.
+        ("Lease term 2026-02-01 2027-01-31", "Lease term 2026-02-01 2027-01-31"),
+        ("Unit 204 950 2400", "Unit 204 950 2400"),
+        ("Our secret: location, location.", "Our secret: location, location."),
+        ("secret:\nnext line", "secret:\nnext line"),
+        ("Ref 4111 1111 1111 1112", "Ref 4111 1111 1111 1112"),
+        ("Rent $2,850; total 1,250,000; zip 11201-1234", "Rent $2,850; total 1,250,000; zip 11201-1234"),
+    ],
+)
+def test_redaction_cases(text, expected):
+    assert redact_text(text)[0] == expected
+
+
+def test_docx_keeps_equal_neighbours_but_collapses_merged_cells(tmp_path: Path):
+    document = docx.Document()
+    table = document.add_table(rows=2, cols=3)
+    for column, text in enumerate(("Kitchen", "Good", "Good")):
+        table.cell(0, column).text = text
+    merged = table.cell(1, 1).merge(table.cell(1, 2))
+    table.cell(1, 0).text, merged.text = "Deposit", "$2,850"
+    path = tmp_path / "inspection.docx"
+    document.save(str(path))
+    assert extract_text(path).splitlines()[:2] == ["Kitchen | Good | Good", "Deposit | $2,850"]
+
+
+@pytest.mark.parametrize(
+    ("data", "expected"),
+    [
+        ("Lease for Unit 4B.".encode("utf-16"), "Lease for Unit 4B."),
+        (b"\xef\xbb\xbfLease", "Lease"),
+        ("Café lease".encode("cp1252"), "Café lease"),
+        ("Café lease".encode(), "Café lease"),
+    ],
+)
+def test_text_decoding(tmp_path: Path, data: bytes, expected: str):
+    path = tmp_path / "doc.txt"
+    path.write_bytes(data)
+    assert extract_text(path) == expected
+
+
+def test_nul_heavy_text_without_bom_is_an_error(tmp_path: Path):
+    path = tmp_path / "doc.txt"
+    path.write_bytes("Lease for Unit 4B.".encode("utf-16-le"))
+    with pytest.raises(ExtractionError, match="UTF-16 without a byte-order mark"):
+        extract_text(path)
+
+
+def test_same_file_given_twice_is_collected_once(tmp_path: Path, monkeypatch):
+    (tmp_path / "a.md").write_text("a")
+    monkeypatch.chdir(tmp_path)
+    paths, _ = collect_paths(["a.md", str(tmp_path / "a.md"), "."])
+    assert paths == [Path("a.md")]
+
+
+@pytest.mark.parametrize("text", ["password-" * 13_000, "a-" * 60_000, "a." * 60_000, "k: v " * 24_000])
+def test_redaction_stays_linear_on_pathological_input(text):
+    # These took minutes when a pattern backtracked; linear scanning takes well under 100 ms.
+    start = time.perf_counter()
+    redact_text(text)
+    assert time.perf_counter() - start < 2.0
