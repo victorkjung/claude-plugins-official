@@ -1,0 +1,9 @@
+{
+  "name": "typesafe-doc-eval",
+  "version": "0.1.0",
+  "description": "Score documents on quality, audience fit, tone, and readiness with TypeSafe's System One API. Ships the doc-eval CLI with rubric presets for property and leasing docs, deal and investment memos, product and engineering docs, and outbound content.",
+  "author": {
+    "name": "Victor Jung"
+  },
+  "keywords": ["typesafe", "evaluation", "documents", "rubric", "cli"]
+}

@@ -1,0 +1,142 @@
+# Outbound content, including property listing copy.
+name: outbound
+title: Outbound content
+description: Marketing copy, property listing descriptions, emails and newsletters, and blog posts.
+document_kind: >-
+  Outbound or marketing content meant to persuade or inform people outside the business, such as
+  marketing or website copy, a property listing description, an email or newsletter, a social
+  post, or a blog post.
+audience: >-
+  The prospective customers, tenants, buyers, or readers the content is meant to persuade or
+  inform.
+
+policy:
+  pass_at: 75
+  fail_below: 50
+  min_confidence: 0.5
+
+dimensions:
+  message:
+    label: Message clarity
+    group: quality
+    type: score
+    weight: 1.25
+    instructions: >-
+      How quickly and clearly does `document.text` convey its main message: what is offered or
+      said, for whom, and why it matters to them?
+    criteria:
+      - No clear message; a reader could not say what it is about.
+      - The message is muddled or buried under filler.
+      - The message comes through, but only after some reading, or it competes with side points.
+      - The message is clear early, with minor distractions.
+      - The message is unmistakable within the first lines.
+
+  key_details:
+    label: Key details
+    group: quality
+    type: score
+    weight: 1.0
+    instructions:
+      task: >-
+        Does `document.text` include the facts a reader needs in order to act, for the kind of
+        content it is?
+      expected_details:
+        property_listing: [location or neighborhood, price or rent, size, bedrooms and bathrooms, key features and amenities, availability date, terms such as lease length or pet policy, how to view or apply]
+        product_or_service_offer: [what it is, who it is for, price or how to get pricing, key features, how to get started]
+        event_or_announcement: [what, when, where or how to join, who it is for, how to register or respond]
+        article_or_newsletter: [the main point, supporting facts or examples, sources where claims need them]
+      judge: Judge whether the facts needed to act are present, not how persuasive the writing is.
+    criteria:
+      - Almost none of the facts a reader needs are present.
+      - Several essential facts are missing, such as price, location, date, or how to respond.
+      - The essential facts are present, but several useful details are missing.
+      - Nearly all needed details are present, with one minor gap.
+      - Every fact a reader needs in order to act is present.
+
+  value:
+    label: Value & proof
+    group: quality
+    type: score
+    weight: 1.25
+    instructions: >-
+      How specific and credible is the value that `document.text` offers its reader? Look for
+      concrete benefits, details, and proof such as numbers, examples, or testimonials, rather than
+      generic claims like "best in class" or "luxury living".
+    criteria:
+      - No discernible benefit to the reader.
+      - Only generic claims or clichés, with nothing specific or credible.
+      - Some specific benefits, but most claims are generic or unsupported.
+      - Specific, credible benefits with some proof, with minor generic patches.
+      - Compelling, specific benefits backed by concrete proof throughout.
+
+  audience_fit:
+    label: Audience fit
+    group: audience
+    type: score
+    weight: 1.0
+    instructions: >-
+      How well does `document.text` speak to the readers described in
+      `evaluation_context.intended_audience`: their needs, their objections, and their language?
+    criteria:
+      - Written for the wrong reader; the intended audience would not see themselves in it.
+      - Poorly targeted; generic, or focused on the business rather than the reader.
+      - Partly targeted; it addresses some reader needs but misses key concerns.
+      - Well targeted, with minor gaps.
+      - Precisely targeted; it speaks to the reader's needs and objections in their own terms.
+
+  readability:
+    label: Readability
+    group: audience
+    type: score
+    weight: 0.75
+    instructions: >-
+      How easy is `document.text` to read and skim for the readers in
+      `evaluation_context.intended_audience`? Consider the headline or opening, paragraph length,
+      plain language, and scannable formatting.
+    criteria:
+      - Very hard to read; dense, jargon-heavy, and unscannable.
+      - Hard to read; long paragraphs or jargon slow the reader down.
+      - Readable, but dense in places or lacking scannable structure.
+      - Easy to read and skim, with minor dense patches.
+      - Effortless to read; a strong opening, short paragraphs, plain language, and scannable structure.
+
+  tone:
+    label: Tone
+    group: audience
+    type: choice
+    instructions: Which description best fits the tone of `document.text`?
+    criteria:
+      confident: Confident and credible; persuasive without exaggeration.
+      friendly: Warm, conversational, and personable.
+      hype: Exaggerated or pushy, full of superlatives, clichés, or false urgency.
+      flat: Generic, bland, or corporate, with no distinct voice.
+      unprofessional: Sloppy, rude, careless, or inappropriate for the audience.
+    flag:
+      labels: [unprofessional]
+      reason: Tone reads as unprofessional for outbound content.
+
+  call_to_action:
+    label: Call to action
+    group: readiness
+    type: score
+    weight: 1.0
+    instructions: >-
+      How clear and easy is the next step that `document.text` asks the reader to take, such as
+      booking a tour, replying, applying, or signing up?
+    criteria:
+      - No call to action.
+      - A call to action is implied, but it is unclear what to do or how.
+      - A call to action exists, but it is buried, vague, or hard to complete.
+      - A clear call to action with an easy path, with minor friction.
+      - One unmistakable, compelling call to action with a frictionless path and, where relevant, a deadline.
+
+  verdict:
+    label: Verdict
+    group: verdict
+    type: choice
+    role: verdict
+    instructions: Is `document.text` ready to publish or send to its audience as it is now?
+    criteria:
+      approve: Ready to publish or send as is, or with only trivial edits.
+      revise: Needs specific edits to the message, details, proof, call to action, or tone before publishing.
+      reject: Should be rewritten; the message or audience targeting is fundamentally off.

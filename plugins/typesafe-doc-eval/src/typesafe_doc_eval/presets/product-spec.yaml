@@ -1,0 +1,160 @@
+# Product & engineering docs.
+name: product-spec
+title: Product & eng docs
+description: PRDs, technical specs, RFCs and design docs, runbooks, and postmortems.
+document_kind: >-
+  A product or engineering document, such as a product requirements document (PRD), a technical
+  specification, an RFC or design doc, an operational runbook, or an incident postmortem.
+audience: >-
+  The engineers, product managers, designers, and operators who will build, review, approve, or
+  operate what the document describes.
+
+policy:
+  pass_at: 75
+  fail_below: 50
+  min_confidence: 0.5
+
+dimensions:
+  problem_clarity:
+    label: Problem clarity
+    group: quality
+    type: score
+    weight: 1.0
+    instructions: >-
+      How clearly does `document.text` define its problem or purpose: who is affected, what is
+      wrong or needed, and why it matters now? For a runbook, the purpose is the situation it is
+      used in; for a postmortem, it is the incident and its impact.
+    criteria:
+      - No discernible problem or purpose.
+      - The problem is implied, but who is affected and why it matters are unclear.
+      - The problem is stated, but its impact, scope, or urgency is vague.
+      - The problem is clear, with evidence of impact and minor gaps in scope.
+      - A crisp problem statement with who is affected, measurable impact, and why it matters now.
+
+  completeness:
+    label: Completeness
+    group: quality
+    type: score
+    weight: 1.25
+    instructions:
+      task: >-
+        How complete is `document.text` for the kind of product or engineering document it is?
+        Compare it with the elements expected for that kind of document.
+      expected_elements:
+        prd: [problem, goals and non-goals, users and use cases, requirements, success metrics, scope and milestones, dependencies, open questions]
+        spec_or_rfc: [context, proposal or design, alternatives considered, trade-offs, risks, rollout or migration plan, testing plan, open questions]
+        runbook: [when to use it, prerequisites and access, step-by-step procedure, verification, rollback, escalation contacts]
+        postmortem: [summary, impact, timeline, root cause, contributing factors, what went well and poorly, action items with owners and dates]
+      judge: Judge the presence and adequacy of the expected elements.
+    criteria:
+      - Most expected elements are missing; the document cannot serve its purpose.
+      - Several essential elements are missing, such as requirements, the design, the procedure, or the root cause.
+      - The essentials are present, but multiple standard elements are missing or superficial.
+      - Nearly complete; one or two secondary elements are missing or thin.
+      - Every essential and standard element for this kind of document is present.
+
+  specificity:
+    label: Specificity
+    group: quality
+    type: score
+    weight: 1.25
+    instructions: >-
+      How specific and verifiable are the requirements, steps, or claims in `document.text`?
+      Look for measurable acceptance criteria, exact commands or values, and concrete examples
+      rather than vague goals such as "fast", "scalable", or "user-friendly".
+    criteria:
+      - Entirely vague; nothing could be built, tested, or executed from it.
+      - Mostly vague; a few concrete details, but key requirements or steps are not testable.
+      - Mixed; core requirements or steps are concrete, but many are vague or untestable.
+      - Specific and testable throughout, with minor vague spots.
+      - Every requirement, step, or claim is precise, measurable, and verifiable.
+
+  tradeoffs:
+    label: Trade-offs & risks
+    group: quality
+    type: score
+    weight: 1.0
+    instructions: >-
+      How well does `document.text` surface decisions, alternatives, trade-offs, risks, and open
+      questions, rather than presenting one path as obvious? For a runbook, consider failure modes
+      and rollback; for a postmortem, consider contributing factors and residual risks.
+    criteria:
+      - No decisions, alternatives, risks, or open questions are discussed.
+      - Mentions risks or alternatives only in passing, without analysis.
+      - Some trade-offs or risks are analyzed, but important ones are missing.
+      - The main decisions, alternatives, and risks are explained, with minor omissions.
+      - Decisions, alternatives, risks, and open questions are explicit, with reasoning for each.
+
+  audience_fit:
+    label: Audience fit
+    group: audience
+    type: score
+    weight: 0.75
+    instructions: >-
+      How well does `document.text` serve the readers described in
+      `evaluation_context.intended_audience`? Does it give each of them the context and detail
+      they need to build, review, or operate what it describes?
+    criteria:
+      - Written for the wrong reader; the intended audience would not get what they need.
+      - Serves the audience poorly; it assumes missing context or omits what they need.
+      - Partly serves the audience; some needed context or detail is missing.
+      - Serves the audience well, with minor gaps.
+      - Precisely tailored; it anticipates the readers' questions and answers them at the right depth.
+
+  readability:
+    label: Readability
+    group: audience
+    type: score
+    weight: 0.5
+    instructions: >-
+      How easy is `document.text` to read and scan for the readers in
+      `evaluation_context.intended_audience`? Consider headings, lists, diagrams or tables, and
+      whether the key decision or procedure is easy to find.
+    criteria:
+      - Very hard to read; unstructured, with key information buried.
+      - Hard to read; poor structure or jargon makes the key points hard to find.
+      - Readable with effort; some sections are dense or disorganized.
+      - Easy to read and scan, with a few dense patches.
+      - Very easy to read; well structured, with the key points findable at a glance.
+
+  tone:
+    label: Tone
+    group: audience
+    type: choice
+    instructions: Which description best fits the tone of `document.text`?
+    criteria:
+      precise: Direct, factual, and precise.
+      conversational: Informal but clear.
+      hand_wavy: Imprecise; relies on buzzwords, hype, or hand-waving instead of specifics.
+      blameful: Assigns personal blame to individuals rather than examining systems and processes.
+    flag:
+      labels: [blameful]
+      reason: Tone assigns personal blame; engineering reviews and postmortems should be blameless.
+
+  actionability:
+    label: Actionability
+    group: readiness
+    type: score
+    weight: 1.0
+    instructions: >-
+      Could the intended readers act on `document.text` without a meeting to clarify it, for
+      example start building, approve or reject a decision, execute the procedure, or complete
+      the action items?
+    criteria:
+      - Not actionable; readers would not know what to do.
+      - Barely actionable; the next steps require a meeting to clarify.
+      - Partly actionable; some work could start, but key decisions or steps are unclear.
+      - Actionable, with minor questions left.
+      - Fully actionable; readers could start immediately, with owners and next steps clear.
+
+  verdict:
+    label: Verdict
+    group: verdict
+    type: choice
+    role: verdict
+    instructions: >-
+      Is `document.text` ready for approval, implementation, or use by its readers as it is now?
+    criteria:
+      approve: Ready for approval or use as is, or with only trivial edits.
+      revise: Needs specific fixes before it can be approved or used.
+      reject: Must be rewritten; the problem, design, or procedure is missing or unsound as written.

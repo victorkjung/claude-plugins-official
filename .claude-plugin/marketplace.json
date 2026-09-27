@@ -1987,6 +1987,16 @@
       "homepage": "https://www.twilio.com"
     },
     {
+      "name": "typesafe-doc-eval",
+      "description": "Score documents on quality, completeness, audience fit, tone, and readiness with TypeSafe's System One API. Ships the doc-eval CLI with presets for property and leasing docs, deal and investment memos, product and engineering docs, and outbound content.",
+      "author": {
+        "name": "Victor Jung"
+      },
+      "source": "./plugins/typesafe-doc-eval",
+      "category": "productivity",
+      "homepage": "https://github.com/victorkjung/claude-plugins-official/tree/main/plugins/typesafe-doc-eval"
+    },
+    {
       "name": "typescript-lsp",
       "description": "TypeScript/JavaScript language server for enhanced code intelligence",
       "version": "1.0.0",

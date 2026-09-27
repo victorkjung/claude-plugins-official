@@ -1,0 +1,91 @@
+# Example custom rubric: a property manager's monthly report to an owner.
+# Run it with:  doc-eval reports/ --rubric examples/rubrics/owner-report.yaml
+#
+# It shows all three TypeSafe primitives:
+#   score  a degree on ordered levels (weighted into the composite)
+#   noul   a yes/no probability (weighted, and flagged when a required item is missing)
+#   choice one of several labels (the verdict must use approve / revise / reject)
+name: owner-report
+title: Owner monthly reports
+description: Monthly performance reports from a property manager to a property owner.
+document_kind: >-
+  A monthly or quarterly report from a property manager to a property owner covering occupancy,
+  rent collections, maintenance, and financial performance for one or more properties.
+audience: >-
+  A property owner or asset manager who wants to know how the property performed, what needs
+  their decision, and whether the manager is on top of problems.
+
+policy:
+  pass_at: 75
+  fail_below: 50
+  min_confidence: 0.5
+
+dimensions:
+  performance_picture:
+    label: Performance
+    group: quality
+    type: score
+    weight: 1.5
+    instructions: >-
+      How clearly does `document.text` show how the property performed this period, with occupancy,
+      collections, and income and expenses compared against the prior period or the budget?
+    criteria:
+      - No performance figures; the owner cannot tell how the property did.
+      - A few figures without comparison, so the owner cannot tell whether they are good or bad.
+      - The key figures are present, but comparisons to the prior period or budget are missing or incomplete.
+      - Clear figures with comparisons, with minor gaps.
+      - A complete picture with every key figure compared against the prior period and budget, and variances explained.
+
+  candor:
+    label: Candor
+    group: quality
+    type: score
+    weight: 1.0
+    instructions: >-
+      How candidly does `document.text` report problems such as vacancies, delinquencies, major
+      repairs, disputes, or budget overruns, rather than burying or omitting them?
+    criteria:
+      - Problems are hidden or glossed over; the report reads as uniformly positive despite signs of issues.
+      - Problems are mentioned vaguely or buried in the report.
+      - The main problems are reported, but without their size or impact.
+      - Problems are reported clearly, with their size and impact.
+      - Problems are surfaced up front, with their size, impact, and a plan for each.
+
+  includes_delinquencies:
+    label: Delinquencies listed
+    group: quality
+    type: noul
+    weight: 0.5
+    instructions: "`document.text` states how much rent is past due, or explicitly states that none is."
+    criteria:
+      true: It reports past-due rent, or states that none is past due.
+      false: It does not say whether any rent is past due.
+    flag:
+      when: no
+      reason: Report does not say whether any rent is past due.
+
+  owner_decisions:
+    label: Decisions needed
+    group: readiness
+    type: score
+    weight: 1.0
+    instructions: >-
+      How clearly does `document.text` tell the owner which decisions or approvals are needed from
+      them, with the options, costs, and deadlines?
+    criteria:
+      - Decisions are needed, but the report does not ask for them.
+      - Decisions are implied but not asked for directly.
+      - Decisions are asked for, but options, costs, or deadlines are missing.
+      - Decisions are clearly asked for, with minor details missing.
+      - Every decision is asked for explicitly with options, costs, a recommendation, and a deadline, or the report states that none are needed.
+
+  verdict:
+    label: Verdict
+    group: verdict
+    type: choice
+    role: verdict
+    instructions: Is `document.text` ready to send to the owner as it is now?
+    criteria:
+      approve: Ready to send as is, or with only trivial edits.
+      revise: Needs specific additions or corrections before sending.
+      reject: Should be rewritten; key performance information is missing or misleading.

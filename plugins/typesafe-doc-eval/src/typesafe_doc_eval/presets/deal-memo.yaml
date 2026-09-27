@@ -1,0 +1,157 @@
+# Deal & investment memos. Scores the document's decision quality, not the deal itself.
+name: deal-memo
+title: Deal & investment memos
+description: Investment memos, underwriting write-ups, pitch-deck text, and market analyses.
+document_kind: >-
+  An investment or deal document, such as an investment memo, an underwriting or acquisition
+  write-up, the text of a pitch deck, or a market or competitive analysis that supports an
+  investment decision.
+audience: >-
+  Investment committee members, partners, lenders, or investors deciding whether to commit
+  capital.
+
+policy:
+  pass_at: 75
+  fail_below: 50
+  min_confidence: 0.5
+
+dimensions:
+  thesis:
+    label: Thesis
+    group: quality
+    type: score
+    weight: 1.25
+    instructions: >-
+      How clearly does `document.text` state its investment thesis: what is proposed, why it is
+      attractive, and what must be true for it to work? Judge how clearly the case is made, not
+      whether the deal is good.
+    criteria:
+      - No discernible thesis; a reader cannot tell what is proposed or why.
+      - A thesis is implied but vague or scattered across the document.
+      - The thesis is stated, but its key value drivers or the conditions for success are unclear.
+      - A clear thesis with explicit value drivers, with minor gaps in what must be true.
+      - A crisp thesis stated up front, with explicit value drivers and the conditions that must hold for it to work.
+
+  completeness:
+    label: Completeness
+    group: quality
+    type: score
+    weight: 1.25
+    instructions:
+      task: >-
+        How complete is `document.text` for the kind of investment document it is? Compare it with
+        the elements expected for that kind of document.
+      expected_elements:
+        investment_memo: [opportunity summary, market or context, business or asset overview, financials or unit economics, valuation and deal terms, key risks and mitigants, returns or scenarios, recommendation and ask]
+        underwriting: [property or asset details, rent roll or revenue assumptions, operating expenses, financing terms, cash flow projections, sensitivity or downside cases, exit assumptions, recommendation]
+        pitch_deck: [problem, solution, market size, business model, traction, competition, team, financials, the ask and use of funds]
+        market_analysis: [question and scope, market size and growth, segments, competition, trends and drivers, data sources, implications for the decision]
+      judge: Judge the presence and adequacy of the expected elements, not whether the numbers are attractive.
+    criteria:
+      - Most expected elements are missing; the document cannot support a decision.
+      - Several essential elements are missing, such as financials, terms, or risks.
+      - The essentials are present, but multiple standard elements are missing or superficial.
+      - Nearly complete; one or two secondary elements are missing or thin.
+      - Every essential and standard element for this kind of document is present.
+
+  evidence:
+    label: Evidence
+    group: quality
+    type: score
+    weight: 1.5
+    instructions: >-
+      How well are the material claims in `document.text` supported by specific data, sources,
+      comparables, or calculations rather than assertion? Check whether the numbers are
+      internally consistent.
+    criteria:
+      - Claims are unsupported assertions, with no data or sources.
+      - Occasional numbers, but most important claims lack support, or the numbers contradict each other.
+      - Key claims have some data, but important numbers are unsourced, unexplained, or inconsistent.
+      - Most material claims are backed by data or sources, with minor gaps.
+      - Every material claim is backed by specific, sourced, internally consistent data or calculations.
+
+  risks:
+    label: Risk analysis
+    group: quality
+    type: score
+    weight: 1.25
+    instructions: >-
+      How candidly and specifically does `document.text` identify the main risks, explain how they
+      would be mitigated, and show what happens if they occur, such as downside scenarios?
+    criteria:
+      - Risks are not discussed.
+      - Risks are mentioned only generically, such as "market risk", with no analysis.
+      - Some specific risks are identified, but the mitigants or downside impact are thin.
+      - The main risks are specific and come with mitigants or downside scenarios, with minor omissions.
+      - A thorough, candid risk analysis with specific mitigants and quantified downside scenarios.
+
+  audience_fit:
+    label: Audience fit
+    group: audience
+    type: score
+    weight: 0.75
+    instructions: >-
+      How well does `document.text` serve the readers described in
+      `evaluation_context.intended_audience`? Does it answer the questions they would ask before
+      committing capital, at the level of detail they need?
+    criteria:
+      - Written for the wrong reader; decision-makers would not get what they need.
+      - Serves the audience poorly; it skips what investors would ask or buries it in irrelevant detail.
+      - Partly serves the audience; some questions a decision-maker would ask go unanswered.
+      - Serves the audience well, with minor gaps.
+      - Precisely tailored; it anticipates the decision-makers' questions and answers them directly.
+
+  readability:
+    label: Readability
+    group: audience
+    type: score
+    weight: 0.5
+    instructions: >-
+      How easy is `document.text` to read and scan for the readers in
+      `evaluation_context.intended_audience`? Consider whether the conclusion comes first, whether
+      sections are logical, and whether tables or lists present the numbers clearly.
+    criteria:
+      - Very hard to follow; no structure, and the numbers are scattered through dense prose.
+      - Hard to follow; the key conclusion and numbers are buried.
+      - Readable with effort; some sections are disorganized or dense.
+      - Easy to follow, with a few dense patches.
+      - Very easy to follow; conclusion first, logical sections, and numbers presented clearly.
+
+  tone:
+    label: Tone
+    group: audience
+    type: choice
+    instructions: Which description best fits the tone of `document.text`?
+    criteria:
+      balanced: Objective and even-handed; presents upside and downside fairly.
+      promotional: Salesy or hype-driven; emphasizes upside and downplays risk.
+      hedged: So qualified that it avoids taking a clear position.
+      dismissive: Brushes aside concerns, counterarguments, or risks.
+
+  decision_readiness:
+    label: Decision readiness
+    group: readiness
+    type: score
+    weight: 1.0
+    instructions: >-
+      Does `document.text` end with a clear recommendation and a specific ask, such as the amount,
+      terms, timeline, and next steps, that a decision-maker could act on?
+    criteria:
+      - No recommendation or ask.
+      - A vague lean or an ask without specifics.
+      - A recommendation exists, but the ask, terms, or timeline are incomplete.
+      - A clear recommendation and ask, with minor details missing.
+      - An explicit recommendation with a specific ask, terms, timeline, and next steps.
+
+  verdict:
+    label: Verdict
+    group: verdict
+    type: choice
+    role: verdict
+    instructions: >-
+      Is `document.text` ready to support an investment decision? Judge the document's quality
+      as decision support, not whether the investment itself is attractive.
+    criteria:
+      approve: Decision-ready; the thesis, evidence, risks, and ask are sufficient to decide.
+      revise: Needs specific additions, such as data, risk analysis, or clearer terms, before a decision.
+      reject: Must be substantially rewritten; the core thesis, evidence, or structure is missing.
